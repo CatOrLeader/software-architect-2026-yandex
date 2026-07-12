@@ -38,7 +38,11 @@ jobs:
     - name: Generate Diagrams
       env:
         PLANTUML_SECURITY_PROFILE: UNSECURE
-      run: find diagrams -name '*.puml' -type f -not -empty -print0 | xargs -0 java -jar plantuml.jar -tpng
+      run: |
+        java -jar plantuml.jar -tpng diagrams/context/*.puml
+        java -jar plantuml.jar -tpng diagrams/container/*.puml
+        java -jar plantuml.jar -tpng diagrams/component/*.puml
+        java -jar plantuml.jar -tpng diagrams/code/*.puml
 
     - name: Commit Diagrams
       if: github.event_name == 'push'
