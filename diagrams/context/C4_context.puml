@@ -2,11 +2,6 @@
 
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
 
-skinparam linetype ortho
-skinparam nodesep 70
-skinparam ranksep 90
-skinparam ArrowFontSize 10
-
 title Контекстная диаграмма системы умного дома
 
 Person_Ext(user, "Пользователь", "Управляет отоплением и отслеживает температуру")
