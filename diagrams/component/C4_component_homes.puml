@@ -1,0 +1,35 @@
+@startuml
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+skinparam linetype ortho
+skinparam nodesep 70
+skinparam ranksep 90
+skinparam ArrowFontSize 10
+
+title Компоненты сервиса управления домами
+
+Container_Ext(apiGateway, "API Gateway", "Go", "Маршрутизирует пользовательские запросы")
+Container_Ext(userService, "Сервис пользователей", "Go", "Проверяет пользователя и его права")
+Container_Ext(moduleService, "Сервис модулей", "Go", "Проверяет дом при подключении устройства")
+ContainerDb_Ext(homeDatabase, "БД домов", "PostgreSQL", "Хранит дома и права доступа")
+
+Container_Boundary(homeService, "Сервис управления домами") {
+    Component(homeApi, "API домов", "HTTP API", "Создает дома и управляет их настройками")
+    Component(homeManager, "Менеджер домов", "Go", "Реализует операции с домами")
+    Component(accessManager, "Менеджер доступа к дому", "Go", "Управляет владельцами и участниками дома")
+    Component(userClient, "Клиент сервиса пользователей", "HTTP Client", "Проверяет пользователя и глобальные права")
+    Component(homeRepository, "Репозиторий домов", "Go", "Читает и сохраняет дома и права")
+}
+
+Rel(apiGateway, homeApi, "Управляет домами", "REST")
+Rel(moduleService, accessManager, "Проверяет дом и доступ", "REST")
+Rel(homeApi, homeManager, "Передает запрос")
+Rel(homeManager, accessManager, "Проверяет права")
+Rel(accessManager, userClient, "Проверяет пользователя")
+Rel(homeManager, homeRepository, "Читает и записывает")
+Rel(accessManager, homeRepository, "Читает права")
+Rel(userClient, userService, "Запрашивает пользователя", "REST")
+Rel(homeRepository, homeDatabase, "Читает и записывает", "SQL/TCP")
+
+@enduml

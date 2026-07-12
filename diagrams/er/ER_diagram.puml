@@ -1,0 +1,178 @@
+@startuml
+
+title Логическая ER-диаграмма экосистемы умного дома
+
+skinparam backgroundColor white
+skinparam linetype ortho
+skinparam nodesep 55
+skinparam ranksep 80
+skinparam ArrowFontSize 10
+hide methods
+
+package "БД пользователей" {
+    entity "User" as users {
+        * id : UUID <<PK>>
+        --
+        * email : varchar <<UQ>>
+        * password_hash : varchar
+        * name : varchar
+        * status : varchar
+        * created_at : timestamp
+    }
+}
+
+package "БД домов" {
+    entity "House" as houses {
+        * id : UUID <<PK>>
+        --
+        * owner_user_id : UUID <<logical FK>>
+        * name : varchar
+        address : varchar
+        * timezone : varchar
+        * created_at : timestamp
+    }
+
+    entity "HouseAccess" as house_access {
+        * house_id : UUID <<PK, FK>>
+        * user_id : UUID <<PK, logical FK>>
+        --
+        * role : varchar
+        * granted_at : timestamp
+    }
+}
+
+package "БД модулей" {
+    entity "Module" as modules {
+        * id : UUID <<PK>>
+        --
+        * house_id : UUID <<logical FK>>
+        * serial_number : varchar <<UQ>>
+        * manufacturer : varchar
+        * model : varchar
+        * protocol : varchar
+        * status : varchar
+        activated_at : timestamp
+        last_seen_at : timestamp
+    }
+
+    entity "Device" as devices {
+        * id : UUID <<PK>>
+        --
+        * module_id : UUID <<FK>>
+        * type_id : UUID <<FK>>
+        * name : varchar
+        * status : varchar
+        * configuration : jsonb
+        * created_at : timestamp
+    }
+
+    entity "DeviceType" as device_types {
+        * id : UUID <<PK>>
+        --
+        * code : varchar <<UQ>>
+        * name : varchar
+        * schema_version : integer
+    }
+
+    entity "Capability" as capabilities {
+        * id : UUID <<PK>>
+        --
+        * code : varchar <<UQ>>
+        * name : varchar
+        * command_schema : jsonb
+    }
+
+    entity "DeviceTypeCapability" as type_capabilities {
+        * device_type_id : UUID <<PK, FK>>
+        * capability_id : UUID <<PK, FK>>
+        --
+        settings_schema : jsonb
+    }
+
+    entity "Command" as commands {
+        * id : UUID <<PK>>
+        --
+        * device_id : UUID <<FK>>
+        * user_id : UUID <<logical FK>>
+        * idempotency_key : varchar <<UQ>>
+        * capability : varchar
+        * action : varchar
+        payload : jsonb
+        * status : varchar
+        error : varchar
+        * created_at : timestamp
+        completed_at : timestamp
+    }
+}
+
+package "БД телеметрии" {
+    entity "TelemetryData" as telemetry {
+        * id : UUID <<PK>>
+        --
+        * device_id : UUID <<logical FK>>
+        * metric : varchar
+        value : jsonb
+        * recorded_at : timestamp
+        * received_at : timestamp
+    }
+}
+
+package "БД сценариев" {
+    entity "Scenario" as scenarios {
+        * id : UUID <<PK>>
+        --
+        * house_id : UUID <<logical FK>>
+        * owner_user_id : UUID <<logical FK>>
+        * name : varchar
+        * enabled : boolean
+        * created_at : timestamp
+    }
+
+    entity "ScenarioCondition" as scenario_conditions {
+        * id : UUID <<PK>>
+        --
+        * scenario_id : UUID <<FK>>
+        device_id : UUID <<logical FK>>
+        * event_type : varchar
+        * operator : varchar
+        expected_value : jsonb
+    }
+
+    entity "ScenarioAction" as scenario_actions {
+        * id : UUID <<PK>>
+        --
+        * scenario_id : UUID <<FK>>
+        * device_id : UUID <<logical FK>>
+        * capability : varchar
+        * action : varchar
+        payload : jsonb
+        * execution_order : integer
+    }
+}
+
+users ||--o{ houses : владеет
+users ||--o{ house_access : имеет доступ
+houses ||--o{ house_access : предоставляет доступ
+
+houses ||--o{ modules : содержит
+modules ||--o{ devices : предоставляет
+device_types ||--o{ devices : классифицирует
+device_types ||--o{ type_capabilities
+capabilities ||--o{ type_capabilities
+devices ||--o{ commands : выполняет
+
+devices ||--o{ telemetry : генерирует
+
+users ||--o{ scenarios : создает
+houses ||--o{ scenarios : содержит
+scenarios ||--o{ scenario_conditions : включает
+scenarios ||--o{ scenario_actions : выполняет
+devices ||--o{ scenario_conditions : источник события
+devices ||--o{ scenario_actions : цель действия
+
+note bottom
+  logical FK обозначает ссылку на сущность другого микросервиса.
+  Она проверяется через API или события и не является физическим FK между базами данных.
+end note
+
+@enduml

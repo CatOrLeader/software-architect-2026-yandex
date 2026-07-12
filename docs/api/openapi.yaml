@@ -1,0 +1,426 @@
+openapi: 3.0.3
+info:
+  title: SmartHome Device API
+  version: 1.0.0
+  description: REST API сервисов управления модулями и телеметрии.
+servers:
+  - url: https://api.smarthome.example.com/api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Devices
+  - name: Commands
+  - name: Telemetry
+
+paths:
+  /devices/registrations:
+    post:
+      tags: [Devices]
+      summary: Активировать и привязать устройство к дому
+      operationId: registerDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceRequest'
+            examples:
+              heatingModule:
+                value:
+                  activationCode: ACT-7K3M-92QF
+                  houseId: 0d968c4e-a5e0-4b9a-a233-292ebf555e7f
+                  name: Отопление в гостиной
+      responses:
+        '201':
+          description: Устройство зарегистрировано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+              examples:
+                registered:
+                  $ref: '#/components/examples/HeatingDevice'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Код активации уже использован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: DEVICE_ALREADY_REGISTERED
+                message: Устройство уже зарегистрировано
+
+  /devices/{deviceId}:
+    get:
+      tags: [Devices]
+      summary: Получить устройство и его возможности
+      operationId: getDevice
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '200':
+          description: Информация об устройстве
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+              examples:
+                heating:
+                  $ref: '#/components/examples/HeatingDevice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /devices/{deviceId}/commands:
+    post:
+      tags: [Commands]
+      summary: Отправить команду устройству
+      description: Повторный запрос с тем же Idempotency-Key возвращает ранее созданную команду.
+      operationId: sendDeviceCommand
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Уникальный ключ запроса команды.
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 128
+          example: heating-on-2026-07-12T18:30:00Z
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommandRequest'
+            examples:
+              turnOnHeating:
+                value:
+                  capability: switch
+                  action: turn_on
+                  payload: {}
+      responses:
+        '202':
+          description: Команда принята для выполнения
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+              example:
+                id: e16eae9d-cbf7-43ff-ab83-a3e3d183bc84
+                deviceId: d90dd572-cf67-4a33-9795-8c59a0f06663
+                capability: switch
+                action: turn_on
+                status: PENDING
+                createdAt: '2026-07-12T18:30:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Устройство не поддерживает возможность или команду
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: UNSUPPORTED_CAPABILITY
+                message: Устройство не поддерживает команду switch.turn_on
+
+  /commands/{commandId}:
+    get:
+      tags: [Commands]
+      summary: Получить состояние команды
+      operationId: getCommand
+      parameters:
+        - name: commandId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Текущее состояние команды
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+              example:
+                id: e16eae9d-cbf7-43ff-ab83-a3e3d183bc84
+                deviceId: d90dd572-cf67-4a33-9795-8c59a0f06663
+                capability: switch
+                action: turn_on
+                status: EXECUTED
+                createdAt: '2026-07-12T18:30:00Z'
+                completedAt: '2026-07-12T18:30:01Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /devices/{deviceId}/telemetry:
+    get:
+      tags: [Telemetry]
+      summary: Получить телеметрию устройства
+      operationId: getDeviceTelemetry
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+        - name: metric
+          in: query
+          schema:
+            type: string
+          example: temperature
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+      responses:
+        '200':
+          description: Показания в порядке убывания времени
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelemetryPage'
+              example:
+                items:
+                  - metric: temperature
+                    value: 22.4
+                    recordedAt: '2026-07-12T18:29:55Z'
+                    receivedAt: '2026-07-12T18:29:56Z'
+                nextCursor: null
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    DeviceId:
+      name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    RegisterDeviceRequest:
+      type: object
+      required: [activationCode, houseId, name]
+      properties:
+        activationCode:
+          type: string
+        houseId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+
+    Device:
+      type: object
+      required: [id, houseId, name, type, status, capabilities]
+      properties:
+        id:
+          type: string
+          format: uuid
+        houseId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+          enum: [ONLINE, OFFLINE, DISABLED]
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Capability'
+
+    Capability:
+      type: object
+      required: [code, commands]
+      properties:
+        code:
+          type: string
+        commands:
+          type: array
+          items:
+            type: string
+        parameters:
+          type: object
+          additionalProperties: true
+
+    CommandRequest:
+      type: object
+      required: [capability, action]
+      properties:
+        capability:
+          type: string
+        action:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+
+    Command:
+      type: object
+      required: [id, deviceId, capability, action, status, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        capability:
+          type: string
+        action:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, SENT, EXECUTED, FAILED]
+        error:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    TelemetryItem:
+      type: object
+      required: [metric, value, recordedAt, receivedAt]
+      properties:
+        metric:
+          type: string
+        value: {}
+        recordedAt:
+          type: string
+          format: date-time
+        receivedAt:
+          type: string
+          format: date-time
+
+    TelemetryPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TelemetryItem'
+        nextCursor:
+          type: string
+          nullable: true
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: VALIDATION_ERROR
+            message: Некорректное тело запроса
+    Unauthorized:
+      description: Аутентификация не выполнена
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: UNAUTHORIZED
+            message: Требуется действительный access token
+    Forbidden:
+      description: Нет доступа к дому или устройству
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: ACCESS_DENIED
+            message: Недостаточно прав для выполнения операции
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: NOT_FOUND
+            message: Запрошенный ресурс не найден
+
+  examples:
+    HeatingDevice:
+      value:
+        id: d90dd572-cf67-4a33-9795-8c59a0f06663
+        houseId: 0d968c4e-a5e0-4b9a-a233-292ebf555e7f
+        name: Отопление в гостиной
+        type: heating_controller
+        status: ONLINE
+        capabilities:
+          - code: switch
+            commands: [turn_on, turn_off]
+            parameters: {}
+          - code: target_temperature
+            commands: [set]
+            parameters:
+              min: 5
+              max: 35
+

@@ -1,0 +1,36 @@
+@startuml
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+skinparam linetype ortho
+skinparam nodesep 70
+skinparam ranksep 90
+skinparam ArrowFontSize 10
+
+title Компоненты сервиса сценариев
+
+Container_Ext(apiGateway, "API Gateway", "Go", "Маршрутизирует пользовательские запросы")
+Container_Ext(mqttBroker, "MQTT Broker", "MQTT", "Доставляет события устройств")
+Container_Ext(moduleService, "Сервис модулей", "Go", "Выполняет команды устройств")
+ContainerDb_Ext(scenarioDatabase, "БД сценариев", "PostgreSQL", "Хранит условия и действия сценариев")
+
+Container_Boundary(scenarioService, "Сервис сценариев") {
+    Component(scenarioApi, "API сценариев", "HTTP API", "Создает, изменяет и активирует сценарии")
+    Component(scenarioManager, "Менеджер сценариев", "Go", "Проверяет и сохраняет правила пользователя")
+    Component(eventConsumer, "Обработчик событий", "MQTT consumer", "Принимает события устройств")
+    Component(ruleEngine, "Сервис правил", "Go", "Проверяет условия и формирует действия")
+    Component(moduleClient, "Клиент сервиса модулей", "HTTP Client", "Передает команды устройств")
+    Component(scenarioRepository, "Репозиторий сценариев", "Go", "Читает и сохраняет сценарии")
+}
+
+Rel(apiGateway, scenarioApi, "Управляет сценариями", "REST")
+Rel(scenarioApi, scenarioManager, "Передает запрос")
+Rel(scenarioManager, scenarioRepository, "Читает и записывает")
+Rel(mqttBroker, eventConsumer, "Доставляет события", "MQTT")
+Rel(eventConsumer, ruleEngine, "Передает событие")
+Rel(ruleEngine, scenarioRepository, "Загружает активные правила")
+Rel(ruleEngine, moduleClient, "Передает действия")
+Rel(moduleClient, moduleService, "Выполняет команды", "REST")
+Rel(scenarioRepository, scenarioDatabase, "Читает и записывает", "SQL/TCP")
+
+@enduml

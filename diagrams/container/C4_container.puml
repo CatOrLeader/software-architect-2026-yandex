@@ -1,0 +1,94 @@
+@startuml
+
+title Диаграмма контейнеров системы умного дома
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+!define DEVICONS https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/devicons
+!define FONTAWESOME https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/font-awesome-5
+!include DEVICONS/go.puml
+!include DEVICONS/postgresql.puml
+!include DEVICONS/react.puml
+!include FONTAWESOME/users.puml
+
+LAYOUT_TOP_DOWN()
+skinparam linetype ortho
+skinparam nodesep 70
+skinparam ranksep 90
+skinparam ArrowFontSize 10
+
+Person(user, "Пользователь", "Управляет умным домом", $sprite="users")
+System_Ext(mqttDevices, "MQTT-устройства партнеров", "Отопление, освещение, ворота и будущие типы устройств")
+System_Ext(otherDevices, "Другие устройства партнеров", "Устройства, подключаемые через адаптеры стандартных протоколов")
+System_Ext(cameras, "Камеры партнеров", "Передают видеопоток для удаленного наблюдения")
+
+System_Boundary(smartHomeSystem, "Система SmartHome") {
+    Container(webApplication, "Web Interface", "React", "Служит единой точкой входа и взаимодействия с системой SmartHome", $sprite="react")
+    Container(apiGateway, "API Gateway", "Go", "Маршрутизирует запросы по разным микросервисам", $sprite="go")
+
+    Boundary(services, "Микросервисы системы") {
+        Boundary(accessServices, "Пользователи и дома") {
+            Container(userService, "Сервис пользователей", "Go", "Управляет пользователями и доступом", $sprite="go")
+            ContainerDb(userDatabase, "БД пользователей", "PostgreSQL", "Хранит данные пользователей", $sprite="postgresql")
+            Container(homeService, "Сервис домов", "Go", "Управляет домами и правами доступа", $sprite="go")
+            ContainerDb(homeDatabase, "БД домов", "PostgreSQL", "Хранит дома и их привязку к пользователям", $sprite="postgresql")
+        }
+
+        Boundary(deviceServices, "Устройства и автоматизация") {
+            Container(moduleService, "Сервис модулей", "Go", "Управляет устройствами через унифицированные возможности", $sprite="go")
+            ContainerDb(moduleDatabase, "БД модулей", "PostgreSQL", "Хранит устройства, возможности и привязку к домам", $sprite="postgresql")
+            Container(scenarioService, "Сервис сценариев", "Go", "Выполняет пользовательские правила автоматизации", $sprite="go")
+            ContainerDb(scenarioDatabase, "БД сценариев", "PostgreSQL", "Хранит условия и действия сценариев", $sprite="postgresql")
+        }
+
+        Boundary(monitoringServices, "Мониторинг") {
+            Container(telemetryService, "Сервис телеметрии", "Go", "Обрабатывает и предоставляет показания устройств", $sprite="go")
+            ContainerDb(telemetryDatabase, "БД телеметрии", "PostgreSQL", "Хранит состояния и показания устройств", $sprite="postgresql")
+        }
+    }
+
+    Container(deviceGateway, "Шлюз устройств", "Go", "Проверяет команды и преобразует их в протоколы устройств через адаптеры", $sprite="go")
+    Container(mqttBroker, "MQTT Broker", "MQTT", "Доставляет команды, состояния и телеметрию")
+    Container(mediaGateway, "Медиашлюз", "WebRTC / HLS", "Предоставляет безопасный удаленный доступ к видеопотокам")
+}
+
+Lay_R(accessServices, deviceServices)
+Lay_R(deviceServices, monitoringServices)
+Lay_R(userService, homeService)
+Lay_R(homeService, moduleService)
+Lay_R(moduleService, scenarioService)
+Lay_R(scenarioService, telemetryService)
+Lay_R(deviceGateway, mediaGateway)
+Lay_R(mqttDevices, otherDevices)
+Lay_R(otherDevices, cameras)
+
+Rel_D(userService, userDatabase, "SQL/TCP")
+Rel_D(homeService, homeDatabase, "SQL/TCP")
+Rel_D(moduleService, moduleDatabase, "SQL/TCP")
+Rel_D(telemetryService, telemetryDatabase, "SQL/TCP")
+Rel_D(scenarioService, scenarioDatabase, "SQL/TCP")
+
+Rel_D(user, webApplication, "Использует", "HTTPS")
+Rel_D(webApplication, apiGateway, "Вызывает API", "HTTPS")
+Rel_D(apiGateway, userService, "REST")
+Rel_D(apiGateway, homeService, "REST")
+Rel_D(apiGateway, moduleService, "REST")
+Rel_D(apiGateway, telemetryService, "REST")
+Rel_D(apiGateway, scenarioService, "REST")
+Rel_D(apiGateway, mediaGateway, "Выдает временный доступ", "REST")
+
+Rel_L(homeService, userService, "REST")
+Rel_L(moduleService, homeService, "REST")
+Rel_D(moduleService, deviceGateway, "REST")
+Rel_L(scenarioService, moduleService, "REST")
+
+BiRel_D(deviceGateway, mqttBroker, "Команды, состояния и телеметрия", "MQTT")
+Rel_U(mqttBroker, telemetryService, "Передает телеметрию", "MQTT")
+Rel_U(mqttBroker, scenarioService, "Передает события", "MQTT")
+BiRel_D(mqttBroker, mqttDevices, "Команды, состояния и телеметрия", "MQTT через TLS")
+BiRel_D(deviceGateway, otherDevices, "Опрашивает и управляет", "HTTPS / стандартные протоколы")
+
+Rel_D(webApplication, mediaGateway, "Получает поток по временному URL", "WebRTC / HLS")
+Rel_U(cameras, mediaGateway, "Передает видеопоток", "WebRTC / RTSP")
+
+@enduml

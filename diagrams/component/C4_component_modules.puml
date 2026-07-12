@@ -1,0 +1,42 @@
+@startuml
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+skinparam linetype ortho
+skinparam nodesep 70
+skinparam ranksep 90
+skinparam ArrowFontSize 10
+
+title Компоненты сервиса управления модулями
+
+Container_Ext(apiGateway, "API Gateway", "Go", "Маршрутизирует пользовательские запросы")
+Container_Ext(homeService, "Сервис домов", "Go", "Проверяет дом и права доступа")
+Container_Ext(scenarioService, "Сервис сценариев", "Go", "Запускает команды сценариев")
+Container_Ext(deviceGateway, "Шлюз устройств", "Go", "Преобразует команды в протокол устройства")
+ContainerDb_Ext(moduleDatabase, "БД модулей", "PostgreSQL", "Хранит устройства, возможности и привязки")
+
+Container_Boundary(moduleService, "Сервис управления модулями") {
+    Component(moduleApi, "API модулей", "HTTP API", "Принимает запросы регистрации, настройки и управления")
+    Component(provisioning, "Менеджер подключения", "Go", "Активирует устройство и привязывает его к дому")
+    Component(capabilityManager, "Менеджер возможностей", "Go", "Проверяет поддерживаемые устройством команды")
+    Component(commandHandler, "Обработчик команд", "Go", "Создает идемпотентные команды и отслеживает их статус")
+    Component(homeClient, "Клиент сервиса домов", "HTTP Client", "Проверяет дом и права пользователя")
+    Component(deviceGatewayClient, "Клиент шлюза устройств", "HTTP Client", "Передает унифицированные команды")
+    Component(moduleRepository, "Репозиторий модулей", "Go", "Читает и сохраняет устройства и команды")
+}
+
+Rel(apiGateway, moduleApi, "Управляет модулями", "REST")
+Rel(scenarioService, moduleApi, "Выполняет команды сценариев", "REST")
+Rel(moduleApi, provisioning, "Подключает устройство")
+Rel(moduleApi, commandHandler, "Передает команду")
+Rel(provisioning, homeClient, "Проверяет доступ")
+Rel(provisioning, capabilityManager, "Определяет возможности")
+Rel(provisioning, moduleRepository, "Сохраняет устройство")
+Rel(commandHandler, capabilityManager, "Проверяет команду")
+Rel(commandHandler, deviceGatewayClient, "Отправляет команду")
+Rel(commandHandler, moduleRepository, "Сохраняет статус")
+Rel(homeClient, homeService, "Запрашивает дом и права", "REST")
+Rel(deviceGatewayClient, deviceGateway, "Передает команду", "REST")
+Rel(moduleRepository, moduleDatabase, "Читает и записывает", "SQL/TCP")
+
+@enduml
