@@ -23,10 +23,13 @@ This script will:
 Alternatively, you can run Docker Compose directly:
 
 ```bash
-docker-compose up -d
+docker compose up --build -d
 ```
 
-The API will be available at http://localhost:8080
+The APIs will be available at:
+
+- Smart Home API: http://localhost:8080
+- Temperature API: http://localhost:8081
 
 ### Option 2: Manual setup
 
@@ -35,7 +38,7 @@ If you prefer to run the application without Docker:
 1. Start the PostgreSQL database:
 
 ```bash
-docker-compose up -d postgres
+docker compose up -d postgres
 ```
 
 2. Build and run the application:
@@ -58,3 +61,9 @@ A Postman collection is provided for testing the API. Import the `smarthome-api.
 - `PUT /api/v1/sensors/:id` - Update a sensor
 - `DELETE /api/v1/sensors/:id` - Delete a sensor
 - `PATCH /api/v1/sensors/:id/value` - Update a sensor's value and status
+
+## Temperature API Endpoints
+
+- `GET /health` - Health check
+- `GET /temperature?location=Living%20Room` - Get a random temperature by location
+- `GET /temperature/:sensorId` - Get a random temperature by sensor ID
