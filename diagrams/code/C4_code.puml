@@ -1,0 +1,152 @@
+@startuml
+
+title Уровень кода: выполнение команды устройством
+
+top to bottom direction
+skinparam backgroundColor white
+skinparam linetype ortho
+skinparam nodesep 55
+skinparam ranksep 80
+skinparam ArrowFontSize 10
+skinparam classAttributeIconSize 0
+
+package "1. transport/http" as transport {
+    class ModuleAPI <<handler>> {
+        +HandleCommand(request CommandRequest): HTTPResponse
+    }
+}
+
+package "2. application" as application {
+    class CommandHandler <<service>> {
+        +Execute(ctx Context, request CommandRequest): Command
+        +UpdateStatus(ctx Context, result CommandResult)
+    }
+
+    class CapabilityManager <<service>> {
+        +Validate(device Device, command CommandRequest): error
+    }
+}
+
+package "3. ports" as ports {
+    interface CapabilityValidator {
+        +Validate(device Device, command CommandRequest): error
+    }
+
+    interface ModuleRepository {
+        +FindDevice(ctx Context, deviceID UUID): Device
+        +FindCommandByKey(ctx Context, key string): Command
+        +SaveCommand(ctx Context, command Command)
+        +UpdateCommandStatus(ctx Context, id UUID, status CommandStatus)
+    }
+
+    interface HomeAccessChecker {
+        +CanManage(ctx Context, userID UUID, homeID UUID): bool
+    }
+
+    interface DeviceGateway {
+        +Send(ctx Context, command Command): error
+    }
+}
+
+package "4. infrastructure" as infrastructure {
+    class PostgresModuleRepository <<adapter>> {
+        -db DB
+    }
+
+    class HomeServiceClient <<adapter>> {
+        -baseURL string
+    }
+
+    class HTTPDeviceGatewayClient <<adapter>> {
+        -baseURL string
+    }
+}
+
+package "Domain model" as domain {
+    class Device <<entity>> {
+        +ID UUID
+        +HomeID UUID
+        +Type string
+        +Capabilities Capability[]
+    }
+
+    class Capability <<value object>> {
+        +Name string
+        +Commands string[]
+        +Parameters map
+    }
+
+    class Command <<entity>> {
+        +ID UUID
+        +IdempotencyKey string
+        +DeviceID UUID
+        +Capability string
+        +Action string
+        +Payload map
+        +Status CommandStatus
+    }
+
+    class CommandRequest <<DTO>> {
+        +UserID UUID
+        +DeviceID UUID
+        +IdempotencyKey string
+        +Capability string
+        +Action string
+        +Payload map
+    }
+
+    class CommandResult <<DTO>> {
+        +CommandID UUID
+        +Status CommandStatus
+        +Error string
+    }
+
+    enum CommandStatus {
+        PENDING
+        SENT
+        EXECUTED
+        FAILED
+    }
+}
+
+' Фиксируем архитектурные слои и порядок элементов в каждом слое.
+ModuleAPI -[hidden]down- CommandHandler
+CommandHandler -[hidden]right- CapabilityManager
+CommandHandler -[hidden]down- CapabilityValidator
+CapabilityValidator -[hidden]right- ModuleRepository
+ModuleRepository -[hidden]right- HomeAccessChecker
+HomeAccessChecker -[hidden]right- DeviceGateway
+ModuleRepository -[hidden]down- PostgresModuleRepository
+HomeAccessChecker -[hidden]down- HomeServiceClient
+DeviceGateway -[hidden]down- HTTPDeviceGatewayClient
+CapabilityManager -[hidden]right- CommandRequest
+CommandResult -[hidden]down- CommandRequest
+CommandRequest -[hidden]down- Command
+Command -[hidden]down- Device
+
+ModuleAPI --> CommandHandler
+ModuleAPI ..> CommandRequest
+
+CommandHandler --> ModuleRepository
+CommandHandler --> HomeAccessChecker
+CommandHandler --> CapabilityValidator
+CommandHandler --> DeviceGateway
+CommandHandler ..> Command
+
+CapabilityManager ..|> CapabilityValidator
+PostgresModuleRepository ..|> ModuleRepository
+HomeServiceClient ..|> HomeAccessChecker
+HTTPDeviceGatewayClient ..|> DeviceGateway
+
+ModuleRepository ..> Device
+ModuleRepository ..> Command
+Device "1" *-- "1..*" Capability
+Command --> CommandStatus
+CommandResult --> CommandStatus
+
+note bottom of CommandHandler
+  Повторный IdempotencyKey возвращает существующую
+  команду без повторной отправки устройству.
+end note
+
+@enduml

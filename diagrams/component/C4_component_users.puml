@@ -1,0 +1,33 @@
+@startuml
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+skinparam linetype ortho
+skinparam nodesep 70
+skinparam ranksep 90
+skinparam ArrowFontSize 10
+
+title Компоненты сервиса управления пользователями
+
+Container_Ext(apiGateway, "API Gateway", "Go", "Маршрутизирует пользовательские запросы")
+Container_Ext(homeService, "Сервис домов", "Go", "Запрашивает права пользователя")
+ContainerDb_Ext(userDatabase, "БД пользователей", "PostgreSQL", "Хранит пользователей и учетные данные")
+
+Container_Boundary(userService, "Сервис управления пользователями") {
+    Component(userApi, "API пользователей", "HTTP API", "Регистрирует пользователей и управляет профилем")
+    Component(authentication, "Компонент аутентификации", "Go", "Проверяет учетные данные и выдает токены")
+    Component(accessManager, "Менеджер доступа", "Go", "Проверяет роли и права пользователя")
+    Component(userManager, "Менеджер пользователей", "Go", "Реализует операции с пользователями")
+    Component(userRepository, "Репозиторий пользователей", "Go", "Читает и сохраняет пользователей")
+}
+
+Rel(apiGateway, userApi, "Управляет пользователями", "REST")
+Rel(apiGateway, authentication, "Аутентифицирует пользователя", "REST")
+Rel(homeService, accessManager, "Проверяет права", "REST")
+Rel(userApi, userManager, "Передает запрос")
+Rel(authentication, userRepository, "Получает учетные данные")
+Rel(accessManager, userRepository, "Получает роли и права")
+Rel(userManager, userRepository, "Читает и записывает")
+Rel(userRepository, userDatabase, "Читает и записывает", "SQL/TCP")
+
+@enduml

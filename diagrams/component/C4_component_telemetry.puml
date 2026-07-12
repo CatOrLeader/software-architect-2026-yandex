@@ -1,0 +1,32 @@
+@startuml
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+skinparam linetype ortho
+skinparam nodesep 70
+skinparam ranksep 90
+skinparam ArrowFontSize 10
+
+title Компоненты сервиса телеметрии
+
+Container_Ext(apiGateway, "API Gateway", "Go", "Маршрутизирует пользовательские запросы")
+Container_Ext(mqttBroker, "MQTT Broker", "MQTT", "Доставляет состояния и телеметрию устройств")
+ContainerDb_Ext(telemetryDatabase, "БД телеметрии", "PostgreSQL", "Хранит временные ряды и состояния")
+
+Container_Boundary(telemetryService, "Сервис телеметрии") {
+    Component(telemetryApi, "API телеметрии", "HTTP API", "Возвращает историю и текущее состояние устройств")
+    Component(telemetryConsumer, "Обработчик сообщений", "MQTT consumer", "Принимает телеметрию от устройств")
+    Component(telemetryProcessor, "Процессор телеметрии", "Go", "Проверяет, нормализует и агрегирует показания")
+    Component(queryService, "Сервис запросов", "Go", "Формирует выборки телеметрии")
+    Component(telemetryRepository, "Репозиторий телеметрии", "Go", "Читает и сохраняет показания")
+}
+
+Rel(apiGateway, telemetryApi, "Запрашивает телеметрию", "REST")
+Rel(mqttBroker, telemetryConsumer, "Доставляет сообщения", "MQTT")
+Rel(telemetryConsumer, telemetryProcessor, "Передает показания")
+Rel(telemetryProcessor, telemetryRepository, "Сохраняет показания")
+Rel(telemetryApi, queryService, "Передает запрос")
+Rel(queryService, telemetryRepository, "Читает телеметрию")
+Rel(telemetryRepository, telemetryDatabase, "Читает и записывает", "SQL/TCP")
+
+@enduml
