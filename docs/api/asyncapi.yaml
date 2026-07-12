@@ -1,0 +1,152 @@
+asyncapi: 2.6.0
+info:
+  title: SmartHome Device Events API
+  version: 1.0.0
+  description: MQTT-контракты телеметрии и результатов выполнения команд.
+servers:
+  production:
+    url: mqtt.smarthome.example.com:8883
+    protocol: mqtt
+    protocolVersion: '5.0'
+    security:
+      - deviceCertificate: []
+
+channels:
+  devices/{deviceId}/telemetry:
+    description: Устройство публикует измерения и текущее состояние.
+    parameters:
+      deviceId:
+        $ref: '#/components/parameters/deviceId'
+    publish:
+      operationId: publishTelemetry
+      message:
+        $ref: '#/components/messages/TelemetryEvent'
+
+  commands/{commandId}/result:
+    description: Шлюз публикует окончательный результат команды.
+    parameters:
+      commandId:
+        $ref: '#/components/parameters/commandId'
+    publish:
+      operationId: publishCommandResult
+      message:
+        $ref: '#/components/messages/CommandResultEvent'
+
+components:
+  securitySchemes:
+    deviceCertificate:
+      type: X509
+
+  parameters:
+    deviceId:
+      description: UUID зарегистрированного устройства.
+      schema:
+        type: string
+        format: uuid
+    commandId:
+      description: UUID команды.
+      schema:
+        type: string
+        format: uuid
+
+  messages:
+    TelemetryEvent:
+      name: TelemetryEvent
+      title: Новое показание устройства
+      contentType: application/json
+      correlationId:
+        location: $message.header#/correlationId
+      headers:
+        type: object
+        required: [correlationId, schemaVersion]
+        properties:
+          correlationId:
+            type: string
+            format: uuid
+          schemaVersion:
+            type: integer
+            const: 1
+      payload:
+        $ref: '#/components/schemas/TelemetryPayload'
+      examples:
+        - name: temperature
+          headers:
+            correlationId: 13243756-8b85-4aa9-908d-aebe535debb2
+            schemaVersion: 1
+          payload:
+            eventId: 22f099d8-5f01-4514-a829-7a2ff741c971
+            deviceId: d90dd572-cf67-4a33-9795-8c59a0f06663
+            metric: temperature
+            value: 22.4
+            recordedAt: '2026-07-12T18:29:55Z'
+
+    CommandResultEvent:
+      name: CommandResultEvent
+      title: Результат выполнения команды
+      contentType: application/json
+      correlationId:
+        location: $message.header#/correlationId
+      headers:
+        type: object
+        required: [correlationId, schemaVersion]
+        properties:
+          correlationId:
+            type: string
+            format: uuid
+          schemaVersion:
+            type: integer
+            const: 1
+      payload:
+        $ref: '#/components/schemas/CommandResultPayload'
+      examples:
+        - name: executed
+          headers:
+            correlationId: 517d773f-ee49-478b-953b-16aabd77c084
+            schemaVersion: 1
+          payload:
+            eventId: bf901555-23bf-4b20-8a46-c2fc4df55716
+            commandId: e16eae9d-cbf7-43ff-ab83-a3e3d183bc84
+            deviceId: d90dd572-cf67-4a33-9795-8c59a0f06663
+            status: EXECUTED
+            completedAt: '2026-07-12T18:30:01Z'
+
+  schemas:
+    TelemetryPayload:
+      type: object
+      required: [eventId, deviceId, metric, value, recordedAt]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        metric:
+          type: string
+        value: {}
+        recordedAt:
+          type: string
+          format: date-time
+
+    CommandResultPayload:
+      type: object
+      required: [eventId, commandId, deviceId, status, completedAt]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        commandId:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [EXECUTED, FAILED]
+        error:
+          type: string
+        completedAt:
+          type: string
+          format: date-time
+
