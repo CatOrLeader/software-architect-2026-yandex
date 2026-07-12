@@ -19,8 +19,8 @@ jobs:
     - name: Set up Java
       uses: actions/setup-java@v2
       with:
-        java-version: '17'
-        distribution: 'alpine'
+        java-version: '11'
+        distribution: 'temurin'
 
     - name: Install PlantUML
       run: sudo apt-get install plantuml
