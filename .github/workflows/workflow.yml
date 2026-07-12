@@ -19,6 +19,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
 
     - name: Generate Diagrams
       run: |
@@ -35,7 +37,7 @@ jobs:
           diagrams/er/*.puml
 
     - name: Commit Diagrams
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' && github.ref_name == 'main'
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
@@ -43,4 +45,18 @@ jobs:
         if ! git diff --cached --quiet; then
           git commit -m "Automated diagram generation"
           git push origin main
+        fi
+
+    - name: Commit diagrams to warmhouse
+      if: >-
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.ref == 'warmhouse' &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add diagrams/**/*.png
+        if ! git diff --cached --quiet; then
+          git commit -m "Automated diagram generation"
+          git push origin HEAD:warmhouse
         fi
