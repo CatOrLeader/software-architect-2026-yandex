@@ -19,30 +19,19 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up Java
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-
-    - name: Install Graphviz
-      run: sudo apt-get update && sudo apt-get install --yes graphviz
-
-    - name: Download PlantUML 1.2026.4
-      run: |
-        curl --fail --location --silent --show-error \
-          --output plantuml.jar \
-          https://github.com/plantuml/plantuml/releases/download/v1.2026.4/plantuml-1.2026.4.jar
-        java -jar plantuml.jar -version
-
     - name: Generate Diagrams
-      env:
-        PLANTUML_SECURITY_PROFILE: UNSECURE
       run: |
-        java -jar plantuml.jar -tpng diagrams/context/*.puml
-        java -jar plantuml.jar -tpng diagrams/container/*.puml
-        java -jar plantuml.jar -tpng diagrams/component/*.puml
-        java -jar plantuml.jar -tpng diagrams/code/*.puml
+        docker run --rm \
+          --env PLANTUML_SECURITY_PROFILE=UNSECURE \
+          --volume "$GITHUB_WORKSPACE:/workspace" \
+          --workdir /workspace \
+          plantuml/plantuml:1.2026.4@sha256:e0f6fb9cb28defdbcd63320c61d0e98f6cf3302039f881278db8a9cb74c6fed2 \
+          -tpng \
+          diagrams/context/*.puml \
+          diagrams/container/*.puml \
+          diagrams/component/*.puml \
+          diagrams/code/*.puml \
+          diagrams/er/*.puml
 
     - name: Commit Diagrams
       if: github.event_name == 'push'
